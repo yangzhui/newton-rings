@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>牛顿环实验数据处理工具｜逐差法 + 线性拟合</title>
+<style>
+  :root{
+    --navy:#1F3B63; --blue:#2B6CB0; --line:#D8E0EA; --bg:#EEF2F7;
+    --red:#C00000; --green:#2E7D32; --amber:#B26A00; --muted:#5B6B7F;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:18px 14px 40px; background:var(--bg); color:#16202E;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+    font-size:15px; line-height:1.6;
+  }
+  .wrap{max-width:1240px;margin:0 auto}
+  header{text-align:center;margin-bottom:18px}
+  header h1{margin:0 0 6px;font-size:23px;color:var(--navy);letter-spacing:.5px}
+  header p{margin:0;font-size:13px;color:var(--muted)}
+  .card{
+    background:#fff;border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(31,59,99,.06);
+  }
+  .card > h2{
+    margin:0 0 12px;font-size:16px;color:var(--navy);
+    padding-left:10px;border-left:4px solid var(--blue);line-height:1.3;
+  }
+  .grid{display:grid;grid-template-columns:minmax(340px,420px) 1fr;gap:16px;align-items:start}
+  @media (max-width:920px){ .grid{grid-template-columns:1fr} }
+  label{display:block;font-size:13px;font-weight:600;color:var(--navy);margin:10px 0 4px}
+  input[type=text],input[type=number],textarea{
+    width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+    font-size:14px;font-family:inherit;color:#16202E;background:#FBFCFE;
+  }
+  textarea{min-height:190px;resize:vertical;font-family:ui-monospace,Consolas,"Courier New",monospace;
+    font-size:13.5px;line-height:1.7;white-space:pre;overflow-wrap:normal;overflow-x:auto}
+  input:focus,textarea:focus{outline:none;border-color:var(--blue);background:#fff;
+    box-shadow:0 0 0 3px rgba(43,108,176,.12)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .hint{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+  .hint code{background:#EFF3F8;padding:1px 5px;border-radius:4px;color:var(--navy)}
+  .btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+  button{
+    padding:9px 16px;border-radius:8px;border:1px solid var(--line);background:#fff;
+    color:var(--navy);font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;
+    transition:.15s;
+  }
+  button:hover:not(:disabled){background:#F2F6FB;border-color:var(--blue)}
+  button.primary{background:var(--navy);border-color:var(--navy);color:#fff}
+  button.primary:hover:not(:disabled){background:#2A4E7E}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .msg{margin-top:12px;padding:10px 12px;border-radius:8px;font-size:13.5px;display:none}
+  .msg.error{display:block;background:#FDECEA;border:1px solid #F3B8B2;color:#9B1C13}
+  .msg.warn{display:block;background:#FFF7E6;border:1px solid #FFD591;color:var(--amber)}
+  .msg.ok{display:block;background:#EAF7EC;border:1px solid #A8D8B0;color:var(--green)}
+  .msg ul{margin:6px 0 0;padding-left:20px}
+  .msg li{margin:2px 0}
+  canvas{width:100%;height:auto;display:block;border-radius:8px}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:6px}
+  .metric{background:#F7F9FC;border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+  .metric .k{font-size:12px;color:var(--muted);line-height:1.35}
+  .metric .v{font-size:17px;font-weight:700;color:var(--navy);margin-top:3px;
+    font-variant-numeric:tabular-nums;word-break:break-all}
+  .metric .u{font-size:11.5px;color:var(--muted);font-weight:400}
+  .res3{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+  .res{border:1px solid var(--line);border-radius:10px;padding:13px 15px;background:#FCFDFF}
+  .res.acc{border-color:#9CC3E5;background:#F3F8FD}
+  .res h3{margin:0 0 8px;font-size:13.5px;color:var(--navy);text-transform:none}
+  .res .big{font-size:21px;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}
+  .res .big span{font-size:13px;font-weight:400;color:var(--muted)}
+  .res dl{margin:8px 0 0;font-size:13px}
+  .res dt{color:var(--muted);float:left;clear:left;width:52%;}
+  .res dd{margin:0 0 3px;text-align:right;font-variant-numeric:tabular-nums}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px}
+  th,td{border:1px solid var(--line);padding:6px 8px;text-align:center;
+    font-variant-numeric:tabular-nums}
+  th{background:#F2F6FB;color:var(--navy);font-weight:600;font-size:13px}
+  tbody tr:nth-child(even){background:#FAFCFE}
+  details{margin-top:10px}
+  summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--blue);padding:4px 0}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11.5px;
+    font-weight:600;background:#E8EFF7;color:var(--navy)}
+  .note{font-size:13.5px;color:#243447;background:#F7F9FC;border-left:3px solid var(--blue);
+    padding:10px 13px;border-radius:0 8px 8px 0;margin:10px 0}
+  .note b{color:var(--navy)}
+  footer{text-align:center;font-size:12.5px;color:var(--muted);margin-top:6px}
+  ol.origin{margin:8px 0 0;padding-left:22px;font-size:13.5px}
+  ol.origin li{margin:5px 0}
+  ol.origin code, .note code{background:#EFF3F8;padding:1px 5px;border-radius:4px;
+    color:var(--navy);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>牛顿环实验数据处理工具</h1>
+    <p>逐差法 + 一元线性回归（Origin 线性拟合原理）&nbsp;｜&nbsp;对标《逐差法和 Origin 软件在牛顿环实验数据处理中的比较》（石金谷，2024）</p>
+  </header>
+
+  <div class="grid">
+
+    <!-- ============ 左栏：输入 ============ -->
+    <div>
+      <section class="card">
+        <h2>① 数据录入</h2>
+
+        <label for="lam">入射光波长 λ（nm）</label>
+        <input type="number" id="lam" value="589.3" step="0.1" min="1">
+        <p class="hint">钠光灯取 <code>589.3</code> nm。</p>
+
+        <label for="data">暗环直径数据（每行一个环）</label>
+        <textarea id="data" spellcheck="false" placeholder="格式一：只写直径，级数自动从 1 开始
+8.622
+8.460
+8.344
+
+格式二：级数 + 直径（推荐）
+30  8.622
+29  8.460
+28  8.344
+
+也支持：逗号 / 制表符分隔。"></textarea>
+        <p class="hint">
+          两种格式皆可；分隔符支持<b>空格、制表符、逗号、分号</b>。以 <code>#</code> 或 <code>//</code> 开头的行视为注释。
+          <br>从 Excel/Origin 粘贴整列数据即可；<b>级数无需排序</b>，程序会自动排序后配对。
+        </p>
+
+        <div class="btns">
+          <button class="primary" id="btnCalc">开始计算</button>
+          <button id="btnDemo">载入文献示例数据</button>
+          <button id="btnClear">清空</button>
+        </div>
+
+        <div class="msg" id="msg"></div>
+      </section>
+
+      <section class="card">
+        <h2>数据校验规则</h2>
+        <p class="hint" style="margin-top:0">
+          为避免无效数值进入计算，录入数据会逐行检查：
+        </p>
+        <ul class="hint" style="padding-left:20px;margin:6px 0 0">
+          <li><b>空行 / 注释行</b>：自动跳过，不计入。</li>
+          <li><b>非数字</b>（如 <code>abc</code>、<code>8.6.2</code>）：该行报错并忽略。</li>
+          <li><b>级数</b>：必须为非负整数（允许 <code>30.0</code>，自动取整）；出现小数会提示。</li>
+          <li><b>直径</b>：必须为正数且有限；<code>0</code>、负数按无效处理。</li>
+          <li><b>重复级数</b>：同一级数只保留第一次出现，并给出提示。</li>
+          <li><b>数据点数</b>：线性拟合至少需 3 对；逐差法至少需 4 对（2 组配对）。</li>
+        </ul>
+      </section>
+    </div>
+
+    <!-- ============ 右栏：输出 ============ -->
+    <div>
+      <section class="card">
+        <h2>③ 可视化：D² – K 线性拟合图（Origin 风格）</h2>
+        <canvas id="chart" width="1400" height="1000"></canvas>
+        <div class="btns">
+          <button id="btnPng" disabled>下载拟合图（PNG）</button>
+          <button id="btnCsv" disabled>导出计算数据（CSV）</button>
+        </div>
+        <p class="hint">导出的 CSV 含 K、D、D² 三列，可直接导入 Origin 复核（<code>File → Import → CSV</code>）。</p>
+      </section>
+
+      <section class="card">
+        <h2>② 计算结果</h2>
+
+        <div class="res3">
+          <div class="res acc">
+            <h3>方法一 · 手工逐差法</h3>
+            <div class="big" id="rDiff">— <span>mm</span></div>
+            <dl>
+              <dt>配对级差 ΔK</dt><dd id="diffK">—</dd>
+              <dt>配对组数</dt><dd id="diffPairs">—</dd>
+              <dt>平均差值 ⟨D²ₘ−D²ₛ⟩</dt><dd id="diffMean">—</dd>
+              <dt>差值标准差 S</dt><dd id="diffS">—</dd>
+              <dt>不确定度 S_R</dt><dd id="diffSR">—</dd>
+              <dt>相对不确定度 E_R</dt><dd id="diffE">—</dd>
+            </dl>
+          </div>
+
+          <div class="res acc">
+            <h3>方法二 · 一元线性回归（Origin 拟合）</h3>
+            <div class="big" id="rFit">— <span>mm</span></div>
+            <dl>
+              <dt>斜率 B = 4Rλ</dt><dd id="fitB">—</dd>
+              <dt>斜率标准差 s_B</dt><dd id="fitSB">—</dd>
+              <dt>截距 A</dt><dd id="fitA">—</dd>
+              <dt>截距标准差 s_A</dt><dd id="fitSA">—</dd>
+              <dt>相关系数 R²</dt><dd id="fitR2">—</dd>
+              <dt>不确定度 S_R</dt><dd id="fitSR">—</dd>
+              <dt>相对不确定度 E_R</dt><dd id="fitE">—</dd>
+            </dl>
+          </div>
+
+          <div class="res">
+            <h3>两法比较</h3>
+            <div class="big" id="deltaR">— <span>mm</span></div>
+            <dl>
+              <dt>两法 R 之差</dt><dd id="deltaRv">—</dd>
+              <dt>数据点数 N</dt><dd id="nPts">—</dd>
+              <dt>残差标准差(RMSE)</dt><dd id="rmse">—</dd>
+              <dt>D² 的样本标准差 S_y</dt><dd id="sy">—</dd>
+              <dt>√(1−R²)</dt><dd id="sqrtR">—</dd>
+            </dl>
+          </div>
+        </div>
+
+        <div class="metrics" id="quality" style="margin-top:14px"></div>
+
+        <details open>
+          <summary>误差分析</summary>
+          <div id="errBox"></div>
+        </details>
+
+        <details>
+          <summary>完整数据表（含各点残差，逐项可核对）</summary>
+          <div style="overflow-x:auto"><table id="tbl">
+            <thead><tr>
+              <th>K</th><th>左位置</th><th>右位置</th><th>直径 D<br>mm</th>
+              <th>D²<br>mm²</th><th>拟合值<br>mm²</th><th>残差<br>mm²</th>
+              <th>D²ₘ−D²ₛ<br>mm²</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table></div>
+        </details>
+      </section>
+
+      <section class="card">
+        <h2>④ 计算原理（与文献一致）</h2>
+        <p style="margin:0 0 8px">
+          暗环满足光程差条件 δ = <i>r²/R</i> + λ/2 = (2K+1)λ/2，故暗环半径
+          <b>r_K² = K R λ</b>。环心位置不易确定，用直径 D 替换半径 r 得
+        </p>
+        <p style="text-align:center;font-size:16px;margin:10px 0">
+          <b>D_K² = 4 R λ · K</b>
+        </p>
+        <p style="margin:0 0 8px">
+          即 <b>D_K² 与环序数 K 成线性关系</b>，这是逐差法与线性拟合共同的出发点。
+        </p>
+        <div class="note">
+          <b>逐差法：</b>取等间距的两组环 m 与 s（m − s = 常数），由
+          D_m² − D_s² = (m − s)·4Rλ 得 R = ⟨D_m² − D_s²⟩ / [4(m−s)λ]。<br>
+          <b>Origin 线性拟合法：</b>以 K 为自变量、D² 为因变量作线性拟合 y = A + Bx，
+          斜率 B = 4Rλ，故 R = B / (4λ)。
+        </div>
+        <p class="hint" style="margin:0">
+          本工具严按上述两式实现：拟合采用最小二乘法，不确定度按
+          s_R = s_B/(4λ) 与 s_R = S/[4(m−s)λ] 传递，波长统一换算为 mm 参与运算。
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>⑤ 在 Origin 中复核（可选）</h2>
+        <ol class="origin">
+          <li>点击上方「导出计算数据（CSV）」，得到 K、D、D² 三列。</li>
+          <li>Origin 中 <code>File → Import → CSV</code>，或直接复制表格粘贴进 Workbook。</li>
+          <li>选中 A(X)=K、B(Y)=D² 两列 → <code>Plot → Scatter</code>。</li>
+          <li><code>Analysis → Fitting → Linear Fit → Open Dialog</code>，勾选
+              <code>Show Formula on Graph</code>，点 OK。</li>
+          <li>在 Results Log 读取 Intercept、Slope 及其 Standard Error。</li>
+          <li>新增一列输入 <code>col(R) = col(Slope)/(4*5.893e-4)</code> 得到 R（mm）。</li>
+        </ol>
+        <p class="hint">注意：Origin 的 <code>SD</code> 是拟合变量 Y 的标准差；报告曲率半径不确定度时，
+          应使用 <b>Slope 的标准误</b>按 s_R = SE(B)/(4λ) 传递，二者量纲不同不可混用。</p>
+      </section>
+    </div>
+  </div>
+
+  <footer>单文件网页工具 · 数据仅在本机浏览器中计算，不上传任何服务器</footer>
+</div>
+
+<script>
+"use strict";
+
+/* ==================== 状态 ==================== */
+var state = { pts: [], fit: null, diff: null, lamNm: 589.3, left: null, right: null };
+var COLORS = { fit:'#C00000', pt:'#1F4E79', grid:'#E3E9F0', axis:'#43566B', box:'#F5F7FA' };
+
+/* ==================== 工具函数 ==================== */
+var $ = function(id){ return document.getElementById(id); };
+
+function fmt(x, d){
+  if (x === null || x === undefined || !isFinite(x)) return '—';
+  if (d === undefined) d = 4;
+  return Number(x).toFixed(d);
+}
+/* 数值格式化：带科学计数法兜底 */
+function fmtG(x, sig){
+  if (x === null || x === undefined || !isFinite(x)) return '—';
+  if (x === 0) return '0';
+  var a = Math.abs(x);
+  if (a >= 0.001 && a < 1e5) return Number(x).toPrecision(sig || 4).replace(/\.?0+$/,'').replace(/\.$/,'');
+  return x.toExponential(3).replace('e','×10^');
+}
+function mean(a){ return a.reduce(function(s,v){return s+v;},0)/a.length; }
+function toNum(s){ return Number(String(s).trim()); }
+
+function showMsg(type, html){
+  var m = $('msg');
+  m.className = 'msg ' + type;
+  m.innerHTML = html;
+}
+function hideMsg(){ $('msg').className = 'msg'; }
+
+/* ==================== 1. 解析与校验 ==================== */
+function parseData(text){
+  var errors = [], warns = [], raw = [];
+  var lines = String(text).replace(/\r/g, '').split('\n');
+  var dupSet = {}, nonInt = [];
+
+  for (var i = 0; i < lines.length; i++){
+    var s = lines[i].trim();
+    if (!s) continue;                                  // 空行跳过
+    if (s.charAt(0) === '#' || s.indexOf('//') === 0) continue; // 注释
+
+    /* 分隔符：空白（含全角空格）、半/全角逗号、半/全角分号、顿号 */
+    var parts = s.split(/[\s,;，；、]+/u).filter(function(t){ return t !== ''; });
+    var k = null, d = null;
+
+    if (parts.length === 1){
+      d = toNum(parts[0]);
+      if (!isFinite(d)) { errors.push('第 ' + (i+1) + ' 行「' + s + '」不是有效数字，已忽略。'); continue; }
+    } else if (parts.length === 2){
+      k = toNum(parts[0]); d = toNum(parts[1]);
+      if (!isFinite(k) || !isFinite(d)){
+        errors.push('第 ' + (i+1) + ' 行「' + s + '」含非数字内容，已忽略。'); continue;
+      }
+      if (k < 0){ errors.push('第 ' + (i+1) + ' 行级数 K = ' + k + ' 为负数，已忽略。'); continue; }
+      if (Math.abs(k - Math.round(k)) > 1e-9){ nonInt.push(s); }
+      k = Math.round(k);
+    } else {
+      errors.push('第 ' + (i+1) + ' 行「' + s + '」识别到 ' + parts.length + ' 个字段，'
+        + '无法判断格式（应每行 1 个直径，或 级数 + 直径），已忽略。');
+      continue;
+    }
+
+    if (!(d > 0) || !isFinite(d)){
+      errors.push('第 ' + (i+1) + ' 行直径 D = ' + parts[parts.length-1]
+        + ' 必须为正数，已忽略。');
+      continue;
+    }
+    if (k === null) k = raw.length + 1;                // 自动编号
+    raw.push({ k: k, d: d, line: i + 1, order: raw.length });
+  }
+
+  if (nonInt.length){
+    warns.push('以下行的级数不是整数，已四舍五入：' + nonInt.slice(0,4).join('、')
+      + (nonInt.length > 4 ? ' 等' : '') + '。');
+  }
+
+  // 重复级数处理：保留第一次出现
+  var seen = {}, pts = [];
+  for (var j = 0; j < raw.length; j++){
+    var key = raw[j].k;
+    if (seen[key] !== undefined){
+      warns.push('级数 K = ' + key + ' 重复出现（第 ' + raw[j].line + ' 行），'
+        + '已保留第 ' + raw[seen[key]].line + ' 行的数据。');
+      continue;
+    }
+    seen[key] = j;
+    pts.push(raw[j]);
+  }
+
+  // 按级数升序，便于配对与作图
+  pts.sort(function(a,b){ return a.k - b.k; });
+  return { pts: pts, errors: errors, warns: warns, total: raw.length };
+}
+
+/* ==================== 2. 计算核心 ==================== */
+/* 最小二乘线性拟合 y = A + Bx，含斜率/截距标准误 */
+function linearFit(x, y){
+  var n = x.length;
+  var mx = mean(x), my = mean(y);
+  var Sxx = 0, Sxy = 0, Syy = 0;
+  for (var i = 0; i < n; i++){
+    var dx = x[i]-mx, dy = y[i]-my;
+    Sxx += dx*dx; Sxy += dx*dy; Syy += dy*dy;
+  }
+  if (Sxx <= 0) return null;
+  var B = Sxy / Sxx;
+  var A = my - B*mx;
+
+  var ssRes = 0, res = [];
+  for (var j = 0; j < n; j++){
+    var e = y[j] - (A + B*x[j]);
+    res.push(e);
+    ssRes += e*e;
+  }
+  var R2 = Syy > 0 ? 1 - ssRes/Syy : null;
+  var dof = n - 2;
+  var s2 = dof > 0 ? ssRes/dof : null;
+  var rmse = s2 !== null ? Math.sqrt(s2) : null;          // 残差标准差
+  var sB = (rmse !== null ? rmse : 0) / Math.sqrt(Sxx);
+  var sA = (rmse !== null ? rmse : 0) * Math.sqrt(1/n + mx*mx/Sxx);
+
+  return { n:n, A:A, B:B, R2:R2, ssRes:ssRes, rmse:rmse,
+           sB:sB, sA:sA, Sxx:Sxx, mx:mx, res:res };
+}
+
+/* 逐差法：等间距取上下两组环配对 */
+function differenceMethod(pts, lamMm){
+  var n = pts.length;
+  var p = Math.floor(n/2);
+  if (p < 2) return { ok:false, reason:'数据点不足：逐差法至少需要 4 组数据（2 组配对），当前 N = ' + n + '。' };
+
+  var top = pts.slice(n - p);        // 高环序组（已升序，取后一半）
+  var bot = pts.slice(0, p);         // 低环序组
+  var pairs = [], ksteps = [];
+
+  for (var i = 0; i < p; i++){
+    var dm2 = top[i].d*top[i].d, ds2 = bot[i].d*bot[i].d;
+    pairs.push({ m: top[i].k, s: bot[i].k, dm2: dm2, ds2: ds2, diff: dm2 - ds2 });
+    ksteps.push(top[i].k - bot[i].k);
+  }
+
+  var kAvg = mean(ksteps);
+  var stepUniform = ksteps.every(function(v){ return Math.abs(v - kAvg) < 1e-9; });
+  var diffs = pairs.map(function(q){ return q.diff; });
+  var dMean = mean(diffs);
+
+  var ss = 0;
+  for (var t = 0; t < diffs.length; t++) ss += Math.pow(diffs[t] - dMean, 2);
+  var S = Math.sqrt(ss / (p - 1));                 // 样本标准差
+
+  var denom = 4 * kAvg * lamMm;
+  var R = dMean / denom;
+  var SR = S / denom;
+
+  return { ok:true, pairs:pairs, kAvg:kAvg, ksteps:ksteps, stepUniform:stepUniform,
+           nUsed:p*2, nTotal:n, dMean:dMean, S:S, R:R, SR:SR,
+           E: R !== 0 ? SR/R*100 : null };
+}
+
+/* 组装完整结果 */
+function compute(pts, lamNm){
+  var lamMm = lamNm * 1e-6;                        // nm -> mm
+  var x = pts.map(function(q){ return q.k; });
+  var y = pts.map(function(q){ return q.d*q.d; });
+
+  var fit = linearFit(x, y);
+  var diff = differenceMethod(pts, lamMm);
+
+  var out = { lamMm:lamMm, x:x, y:y, fit:fit, diff:diff };
+  if (fit){
+    out.Rfit = fit.B / (4*lamMm);
+    out.SRfit = fit.sB / (4*lamMm);
+    out.Efit = out.Rfit !== 0 ? out.SRfit/out.Rfit*100 : null;
+    out.Sy = (function(){                        // D² 的样本标准差
+      var m = mean(y), s = 0;
+      for (var i=0;i<y.length;i++) s += Math.pow(y[i]-m,2);
+      return Math.sqrt(s/(y.length-1));
+    })();
+    out.sqrtR = fit.R2 !== null ? Math.sqrt(Math.max(0, 1-fit.R2)) : null;
+  }
+  return out;
+}
+
+/* ==================== 3. 绘图（Canvas，Origin 风格） ==================== */
+function drawChart(res){
+  var cv = $('chart');
+  if (!cv) return;
+  var dpr = window.devicePixelRatio || 1;
+  var cssW = cv.clientWidth || 700;
+  var W = 1400, H = 1000;                          // 逻辑尺寸
+  var cssH = Math.round(cssW * H / W);
+  cv.width  = Math.round(W * dpr);
+  cv.height = Math.round(H * dpr);
+  cv.style.height = cssH + 'px';
+  var g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+
+  if (!res || !res.pts || !res.pts.length){
+    g.fillStyle = '#9AA9BC'; g.font = '32px "Microsoft YaHei",sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('录入数据并点击「开始计算」后显示拟合图', W/2, H/2);
+    return;
+  }
+
+  var P = { l: 165, r: 70, t: 70, b: 130 };        // 边距
+  var pw = W - P.l - P.r, ph = H - P.t - P.b;
+
+  var xs = res.pts.map(function(q){ return q.k; });
+  var ys = res.pts.map(function(q){ return q.d*q.d; });
+  var xMin = Math.min.apply(null, xs), xMax = Math.max.apply(null, xs);
+  var yMin = Math.min.apply(null, ys), yMax = Math.max.apply(null, ys);
+
+  /* 坐标范围：取整齐刻度，并让拟合直线端点落在范围内 */
+  function niceTicks(min, max, target){
+    if (min === max){ min -= 1; max += 1; }
+    var raw = (max - min) / target;
+    var mag = Math.pow(10, Math.floor(Math.log(raw)/Math.LN10));
+    var norm = raw / mag, step;
+    if (norm <= 1) step = 1; else if (norm <= 2) step = 2;
+    else if (norm <= 2.5) step = 2.5; else if (norm <= 5) step = 5; else step = 10;
+    step *= mag;
+    var lo = Math.floor(min/step)*step, hi = Math.ceil(max/step)*step;
+    var ticks = [];
+    for (var v = lo; v <= hi + step*1e-6; v += step) ticks.push(Number(v.toFixed(10)));
+    return { lo:lo, hi:hi, step:step, ticks:ticks };
+  }
+  var xt = niceTicks(xMin, xMax, 8);
+  var yt = niceTicks(yMin, yMax, 7);
+
+  function X(v){ return P.l + (v - xt.lo)/(xt.hi - xt.lo) * pw; }
+  function Y(v){ return P.t + ph - (v - yt.lo)/(yt.hi - yt.lo) * ph; }
+
+  /* 网格 */
+  g.strokeStyle = COLORS.grid; g.lineWidth = 1.4;
+  g.font = '26px "Microsoft YaHei",Arial,sans-serif';
+  g.fillStyle = COLORS.axis;
+  for (var i = 0; i < yt.ticks.length; i++){
+    var yy = Y(yt.ticks[i]);
+    g.beginPath(); g.moveTo(P.l, yy); g.lineTo(P.l+pw, yy); g.stroke();
+    g.textAlign = 'right'; g.textBaseline = 'middle';
+    g.fillText(fmtG(yt.ticks[i], 4), P.l - 16, yy);
+  }
+  for (var j = 0; j < xt.ticks.length; j++){
+    var xx = X(xt.ticks[j]);
+    g.beginPath(); g.moveTo(xx, P.t); g.lineTo(xx, P.t+ph); g.stroke();
+    g.textAlign = 'center'; g.textBaseline = 'top';
+    g.fillText(String(Number(xt.ticks[j].toFixed(6))), xx, P.t + ph + 14);
+  }
+
+  /* 坐标框 */
+  g.strokeStyle = COLORS.axis; g.lineWidth = 2.2;
+  g.strokeRect(P.l, P.t, pw, ph);
+
+  /* 拟合直线（按 x 范围外推到坐标框边缘，视觉上贯穿） */
+  if (res.fit){
+    var xa = xt.lo, xb = xt.hi;
+    var ya = res.fit.A + res.fit.B*xa, yb = res.fit.A + res.fit.B*xb;
+    g.save();
+    g.beginPath(); g.rect(P.l, P.t, pw, ph); g.clip();
+    g.strokeStyle = COLORS.fit; g.lineWidth = 3.2;
+    g.beginPath(); g.moveTo(X(xa), Y(ya)); g.lineTo(X(xb), Y(yb)); g.stroke();
+    g.restore();
+  }
+
+  /* 数据点：空心圆 + 十字 */
+  for (var p = 0; p < res.pts.length; p++){
+    var cx = X(res.pts[p].k), cy = Y(res.pts[p].d*res.pts[p].d);
+    g.strokeStyle = COLORS.pt; g.lineWidth = 2.8;
+    g.beginPath(); g.arc(cx, cy, 10, 0, Math.PI*2); g.stroke();
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(cx, cy, 10, 0, Math.PI*2); g.fill();
+    g.strokeStyle = COLORS.pt; g.lineWidth = 2.8;
+    g.beginPath(); g.arc(cx, cy, 10, 0, Math.PI*2); g.stroke();
+    g.lineWidth = 1.8;
+    g.beginPath(); g.moveTo(cx-16, cy); g.lineTo(cx+16, cy); g.stroke();
+    g.beginPath(); g.moveTo(cx, cy-16); g.lineTo(cx, cy+16); g.stroke();
+  }
+
+  /* 轴标签 */
+  g.fillStyle = COLORS.axis;
+  g.font = '32px "Microsoft YaHei",Arial,sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  g.fillText('K', P.l + pw/2, H - 34);
+  /* D² 轴标签（含上标） */
+  var lx = 62, ly = P.t + ph/2;
+  g.save(); g.translate(lx, ly); g.rotate(-Math.PI/2);
+  g.font = '32px "Microsoft YaHei",Arial,sans-serif';
+  g.fillText('D', -20, 0);
+  g.font = '22px "Microsoft YaHei",Arial,sans-serif';
+  g.fillText('2', -4, -14);
+  g.font = '32px "Microsoft YaHei",Arial,sans-serif';
+  g.fillText('/mm', 12, 0);
+  g.font = '22px "Microsoft YaHei",Arial,sans-serif';
+  g.fillText('2', 72, -14);
+  g.restore();
+
+  /* 拟合结果文本框 */
+  if (res.fit){
+    var L = [];
+    L.push('D\u00B2 = ' + fmt(res.fit.A, 4) + (res.fit.B >= 0 ? ' + ' : ' \u2212 ')
+           + fmt(Math.abs(res.fit.B), 4) + ' K');
+    L.push('R\u00B2 = ' + fmt(res.fit.R2, 6));
+    L.push('N = ' + res.fit.n);
+    L.push('B = 4R\u03BB  \u21D2  R = ' + fmt(res.Rfit, 1) + ' mm');
+    g.font = '26px "Microsoft YaHei",Arial,sans-serif';
+    var bw = 0;
+    for (var q = 0; q < L.length; q++) bw = Math.max(bw, g.measureText(L[q]).width);
+    var bpad = 20, lh = 40;
+    var bw2 = bw + bpad*2, bh = L.length*lh + bpad*1.5;
+    var bx = P.l + 26, by = P.t + 26;
+    g.fillStyle = 'rgba(245,247,250,.96)';
+    g.strokeStyle = '#9DB2C6'; g.lineWidth = 1.8;
+    if (g.roundRect){ g.beginPath(); g.roundRect(bx, by, bw2, bh, 12); g.fill(); g.stroke(); }
+    else { g.fillRect(bx, by, bw2, bh); g.strokeRect(bx, by, bw2, bh); }
+    g.fillStyle = '#16202E'; g.textAlign = 'left'; g.textBaseline = 'middle';
+    for (var r2 = 0; r2 < L.length; r2++){
+      g.fillText(L[r2], bx + bpad, by + bpad*0.75 + lh*(r2 + 0.5));
+    }
+  }
+}
+
+/* ==================== 4. 结果渲染 ==================== */
+function render(res){
+  var f = res.fit, d = res.diff;
+
+  /* --- 逐差法 --- */
+  if (d && d.ok){
+    $('rDiff').innerHTML = fmt(d.R, 1) + ' <span>mm</span>';
+    $('diffK').textContent = fmt(d.kAvg, 0) + (d.stepUniform ? '' : '（不等间距）');
+    $('diffPairs').textContent = d.pairs.length + ' 组（用 ' + d.nUsed + '/' + d.nTotal + ' 点）';
+    $('diffMean').textContent = fmt(d.dMean, 3) + ' mm²';
+    $('diffS').textContent = fmt(d.S, 3) + ' mm²';
+    $('diffSR').textContent = '± ' + fmt(d.SR, 3) + ' mm';
+    $('diffE').textContent = fmt(d.E, 3) + ' %';
+  } else {
+    $('rDiff').innerHTML = '不适用 <span></span>';
+    ['diffK','diffPairs','diffMean','diffS','diffSR','diffE'].forEach(function(id){
+      $(id).textContent = '—';
+    });
+  }
+
+  /* --- 线性拟合 --- */
+  if (f){
+    $('rFit').innerHTML = fmt(res.Rfit, 1) + ' <span>mm</span>';
+    $('fitB').textContent = fmt(f.B, 6);
+    $('fitSB').textContent = fmt(f.sB, 6);
+    $('fitA').textContent = fmt(f.A, 4);
+    $('fitSA').textContent = fmt(f.sA, 4);
+    $('fitR2').textContent = fmt(f.R2, 6);
+    $('fitSR').textContent = '± ' + fmt(res.SRfit, 3) + ' mm';
+    $('fitE').textContent = fmt(res.Efit, 3) + ' %';
+  } else {
+    $('rFit').innerHTML = '不可用 <span></span>';
+    ['fitB','fitSB','fitA','fitSA','fitR2','fitSR','fitE'].forEach(function(id){
+      $(id).textContent = '—';
+    });
+  }
+
+  /* --- 两法比较 --- */
+  if (f && d && d.ok){
+    var dr = res.Rfit - d.R;
+    $('deltaR').innerHTML = fmt(dr, 3) + ' <span>mm</span>';
+    $('deltaRv').textContent = '拟合 − 逐差';
+  } else {
+    $('deltaR').innerHTML = '— <span></span>'; $('deltaRv').textContent = '—';
+  }
+  $('nPts').textContent = res.pts.length;
+  $('rmse').textContent = f && f.rmse !== null ? fmt(f.rmse, 4) + ' mm²' : '—';
+  $('sy').textContent = f && res.Sy !== undefined ? fmt(res.Sy, 4) + ' mm²' : '—';
+  $('sqrtR').textContent = f && res.sqrtR !== null ? fmt(res.sqrtR, 6) : '—';
+
+  /* --- 质量标签 --- */
+  var q = $('quality'), h = '';
+  function metric(k, v, u){
+    return '<div class="metric"><div class="k">' + k + '</div><div class="v">'
+      + v + (u ? ' <span class="u">' + u + '</span>' : '') + '</div></div>';
+  }
+  if (f){
+    h += metric('线性相关系数 R²', fmt(f.R2, 4), '越接近 1 越好');
+    h += metric('截距 A', fmt(f.A, 3), 'mm²（理论上应接近 0）');
+    h += metric('残差标准差 RMSE', f.rmse !== null ? fmt(f.rmse, 3) : '—', 'mm²');
+    h += metric('数据点数 N', String(f.n), '参与拟合');
+  }
+  h += metric('波长 λ', fmt(res.lamNm, 1), 'nm');
+  h += metric('逐差法配对', d && d.ok ? (d.pairs.length + ' 组') : '不适用', '');
+  q.innerHTML = h;
+
+  /* --- 误差分析文字 --- */
+  var e = [];
+  e.push('<div class="note"><b>逐差法（文献 2.1 节）</b><br>');
+  if (d && d.ok){
+    e.push('5 组（此处 ' + d.pairs.length + ' 组）配对差值的算术平均值 '
+      + '⟨D²ₘ−D²ₛ⟩ = ' + fmt(d.dMean, 4) + ' mm²，样本标准差 S = ' + fmt(d.S, 4)
+      + ' mm²。<br>'
+      + 'R = ⟨D²ₘ−D²ₛ⟩ / [4(m−s)λ] = ' + fmt(d.dMean, 3) + ' / (4 × '
+      + fmt(d.kAvg, 0) + ' × ' + fmtG(res.lamMm, 4) + ') = <b>' + fmt(d.R, 1) + ' mm</b>；<br>'
+      + 'S_R = S / [4(m−s)λ] = <b>± ' + fmt(d.SR, 3) + ' mm</b>，'
+      + 'E_R = S_R/R = <b>' + fmt(d.E, 3) + '%</b>。<br>'
+      + '结果表示为 R = (' + fmt(d.R, 3) + ' ± ' + fmt(d.SR, 3) + ') mm。');
+  } else {
+    e.push(d ? d.reason : '数据不足，无法执行逐差法。');
+  }
+  e.push('</div>');
+
+  e.push('<div class="note"><b>一元线性回归 / Origin 拟合法（文献 2.2 节）</b><br>');
+  if (f){
+    e.push('以 K 为自变量、D² 为因变量拟合 y = A + Bx，得<br>'
+      + '截距 A = ' + fmt(f.A, 4) + '（标准差 ' + fmt(f.sA, 4) + '），'
+      + '斜率 B = ' + fmt(f.B, 6) + '（标准差 ' + fmt(f.sB, 6) + '），'
+      + 'R² = ' + fmt(f.R2, 6) + '。<br>'
+      + '由 B = 4Rλ 得 R = B/(4λ) = ' + fmt(f.B, 4) + ' / (4 × ' + fmtG(res.lamMm, 4)
+      + ') = <b>' + fmt(res.Rfit, 1) + ' mm</b>；<br>'
+      + '斜率不确定度传递：s_R = s_B/(4λ) = <b>± ' + fmt(res.SRfit, 3) + ' mm</b>，'
+      + 'E_R = <b>' + fmt(res.Efit, 3) + '%</b>。<br>'
+      + '结果表示为 R = (' + fmt(res.Rfit, 3) + ' ± ' + fmt(res.SRfit, 3) + ') mm。');
+  } else {
+    e.push('数据不足，无法完成线性拟合（至少需要 3 组数据）。');
+  }
+  e.push('</div>');
+
+  /* 与文献口径对照 */
+  if (f){
+    e.push('<div class="note"><b>关于误差口径的说明</b><br>'
+      + '文献表 2 中的 <code>SD = 0.160 1</code> 是拟合变量 Y（即 D²，单位 mm²）的标准差，'
+      + '与曲率半径 R 的不确定度量纲不同，不能直接当作 R 的误差使用。<br>'
+      + '本工具报告 R 的不确定度时统一采用斜率传递：s_R = s_B/(4λ)。'
+      + '若按文献的 SD 值以同一公式传递，会得到约 '
+      + fmtG(f.rmse !== null && f.rmse > 0 ? f.rmse/(4*res.lamMm) : 0, 3)
+      + ' mm（此处以本组数据的残差标准差换算示意），与 mm 量级的结果相差悬殊，'
+      + '故推荐以斜率标准误为准。</div>');
+  }
+  $('errBox').innerHTML = e.join('');
+
+  /* --- 数据表 --- */
+  var tb = $('tbl').getElementsByTagName('tbody')[0];
+  tb.innerHTML = '';
+  var diffMap = {};
+  if (d && d.ok){
+    d.pairs.forEach(function(q, idx){ diffMap[q.m] = { v:q.diff, i:idx }; });
+  }
+  for (var i = 0; i < res.pts.length; i++){
+    var q = res.pts[i], tr = document.createElement('tr');
+    var d2 = q.d*q.d;
+    var fitv = f ? f.A + f.B*q.k : null;
+    var rsd  = f ? f.res[i] : null;
+    var dv   = diffMap[q.k] ? fmt(diffMap[q.k].v, 3) : '—';
+    var l = state.left && state.left[q.k] !== undefined ? fmt(state.left[q.k], 3) : '—';
+    var r = state.right && state.right[q.k] !== undefined ? fmt(state.right[q.k], 3) : '—';
+    tr.innerHTML = '<td>' + q.k + '</td><td>' + l + '</td><td>' + r + '</td><td>'
+      + fmt(q.d, 3) + '</td><td>' + fmt(d2, 3) + '</td><td>' + fmt(fitv, 3) + '</td><td>'
+      + fmt(rsd, 4) + '</td><td>' + dv + '</td>';
+    tb.appendChild(tr);
+  }
+
+  $('btnCsv').disabled = false;
+  $('btnPng').disabled = false;
+}
+
+/* ==================== 5. 主流程 ==================== */
+function run(){
+  var lamNm = parseFloat($('lam').value);
+  if (!isFinite(lamNm) || lamNm <= 0){
+    showMsg('error', '波长 λ 必须是大于 0 的数值，请检查后重试。');
+    return;
+  }
+  if (lamNm < 100 || lamNm > 2000){
+    showMsg('warn', '波长 λ = ' + lamNm + ' nm 不在可见光常见范围（约 380–780 nm）内，'
+      + '请确认单位是否为 nm。若确认无误可继续使用。');
+  }
+
+  var text = $('data').value;
+  if (!text.trim()){
+    showMsg('error', '尚未录入数据。请在文本框中输入暗环直径（每行一个），'
+      + '或点击「载入文献示例数据」试用。');
+    return;
+  }
+
+  var parsed = parseData(text);
+  var pts = parsed.pts;
+
+  if (!pts.length){
+    showMsg('error', '没有解析到任何有效数据，请检查输入格式。'
+      + (parsed.errors.length ? '<ul><li>' + parsed.errors.slice(0,8).join('</li><li>')
+        + '</li></ul>' : ''));
+    return;
+  }
+
+  /* 汇总提示 */
+  var blocks = [];
+  if (parsed.errors.length){
+    blocks.push('<b>' + parsed.errors.length + ' 行数据无效，已忽略：</b><ul><li>'
+      + parsed.errors.slice(0,8).join('</li><li>')
+      + (parsed.errors.length > 8 ? '</li><li>…（其余略）' : '') + '</li></ul>');
+  }
+  if (parsed.warns.length){
+    blocks.push('<b>提示：</b><ul><li>' + parsed.warns.slice(0,6).join('</li><li>')
+      + (parsed.warns.length > 6 ? '</li><li>…（其余略）' : '') + '</li></ul>');
+  }
+  if (pts.length < 4){
+    blocks.push('有效数据仅 ' + pts.length + ' 组，逐差法需要至少 4 组；'
+      + '线性拟合需要至少 3 组，结果可靠性有限。');
+  } else if (pts.length < 6){
+    blocks.push('有效数据 ' + pts.length + ' 组，建议按文献取 10 组（m = 30~26，s = 20~16）'
+      + '以获得更稳定的配对结果。');
+  }
+
+  /* 量级校验：捕捉"误把左/右位置读数当直径粘贴"这类错误 */
+  var dMin = pts[0].d, dMax = pts[0].d, d2Max = 0, d2Min = Infinity;
+  for (var bi = 0; bi < pts.length; bi++){
+    var dv = pts[bi].d, d2v = dv*dv;
+    if (dv < dMin) dMin = dv;
+    if (dv > dMax) dMax = dv;
+    if (d2v > d2Max) d2Max = d2v;
+    if (d2v < d2Min) d2Min = d2v;
+  }
+  if (d2Max > 400){
+    blocks.push('★ 数据量级异常：D² 最大达 ' + fmt(d2Max, 1) + ' mm²。'
+      + '牛顿环暗环直径通常不超过 20 mm（D² < 400 mm²），最大约 10 mm。'
+      + '若你粘贴的是<b>“左位置 / 右位置”两列读数</b>，请先用 Excel 相减算出直径 D 再录入。');
+  } else if (dMax > 0 && dMin / dMax > 0.95){
+    blocks.push('★ 各环直径几乎相同（' + fmt(dMin, 3) + ' ~ ' + fmt(dMax, 3)
+      + ' mm），不符合牛顿环直径随级数单调增大的规律，请确认数据是否正确。');
+  }
+  if (blocks.length){
+    showMsg(parsed.errors.length ? 'warn' : 'ok', blocks.join('<hr style="border:none;border-top:1px solid #FFD591;margin:8px 0">'));
+  } else {
+    showMsg('ok', '已成功解析 <b>' + pts.length + '</b> 组数据（级数 ' + pts[0].k + ' ~ '
+      + pts[pts.length-1].k + '），计算完成。');
+  }
+
+  var res = compute(pts, lamNm);
+  res.lamNm = lamNm;
+  res.pts = pts;
+  state.pts = pts; state.fit = res.fit; state.diff = res.diff; state.res = res;
+
+  render(res);
+  drawChart(res);
+}
+
+/* ==================== 6. 导入导出 ==================== */
+function download(name, content, mime){
+  var blob = new Blob([content], { type: mime || 'text/plain;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+}
+
+function csvContent(){
+  var res = state.res;
+  if (!res) return '';
+  var lines = ['K,D/mm,D2/mm2,Fit/mm2,Residual/mm2'];
+  for (var i = 0; i < res.pts.length; i++){
+    var q = res.pts[i], d2 = q.d*q.d;
+    var fitv = res.fit ? res.fit.A + res.fit.B*q.k : '';
+    var rsd  = res.fit ? res.fit.res[i] : '';
+    lines.push([q.k, q.d.toFixed(3), d2.toFixed(3),
+      fitv === '' ? '' : Number(fitv).toFixed(4),
+      rsd === '' ? '' : Number(rsd).toFixed(4)].join(','));
+  }
+  return '\uFEFF' + lines.join('\n');
+}
+
+/* ==================== 7. 事件绑定 ==================== */
+$('btnCalc').addEventListener('click', run);
+
+$('btnDemo').addEventListener('click', function(){
+  /* 文献表 1 原始数据：级数 -> 左右位置读数，直径 = 左 − 右 */
+  var rows = [
+    [30, 31.352, 22.730], [29, 31.228, 22.768], [28, 31.205, 22.861],
+    [27, 31.130, 22.930], [26, 31.048, 22.982],
+    [20, 30.649, 23.477], [19, 30.532, 23.520], [18, 30.431, 23.584],
+    [17, 30.362, 23.691], [16, 30.278, 23.786]
+  ];
+  state.left = {}; state.right = {};
+  var txt = ['# 文献《逐差法和Origin软件在牛顿环实验数据处理中的比较》表1 示例数据',
+             '# 格式：级数K  直径D(mm)   [直径 = 左位置 − 右位置]'];
+  rows.forEach(function(r){
+    var k = r[0], l = r[1], rr = r[2];
+    var d = l - rr;
+    state.left[k] = l; state.right[k] = rr;
+    txt.push(k + '  ' + d.toFixed(3));
+  });
+  $('lam').value = '589.3';
+  $('data').value = txt.join('\n');
+  run();
+});
+
+$('btnClear').addEventListener('click', function(){
+  $('data').value = '';
+  state = { pts:[], fit:null, diff:null, lamNm:589.3, left:null, right:null };
+  $('lam').value = '589.3';
+  hideMsg();
+  ['rDiff','rFit','deltaR'].forEach(function(id){ $(id).innerHTML = '— <span></span>'; });
+  ['diffK','diffPairs','diffMean','diffS','diffSR','diffE',
+   'fitB','fitSB','fitA','fitSA','fitR2','fitSR','fitE',
+   'deltaRv','nPts','rmse','sy','sqrtR'].forEach(function(id){ $(id).textContent = '—'; });
+  $('quality').innerHTML = '';
+  $('errBox').innerHTML = '';
+  $('tbl').getElementsByTagName('tbody')[0].innerHTML = '';
+  $('btnCsv').disabled = true; $('btnPng').disabled = true;
+  drawChart(null);
+});
+
+$('btnCsv').addEventListener('click', function(){
+  var c = csvContent();
+  if (!c) return;
+  download('牛顿环计算数据.csv', c, 'text/csv;charset=utf-8');
+});
+
+$('btnPng').addEventListener('click', function(){
+  var cv = $('chart');
+  if (!state.res) return;
+  var a = document.createElement('a');
+  a.href = cv.toDataURL('image/png');
+  a.download = '牛顿环_D2-K线性拟合图.png';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+});
+
+/* 粘贴时自动尝试计算：内容变化后防抖 500ms */
+var timer = null;
+$('data').addEventListener('input', function(){
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(function(){
+    if ($('data').value.trim()) run();
+  }, 500);
+});
+window.addEventListener('resize', function(){
+  if (state.res) drawChart(state.res);
+});
+
+/* 首屏 */
+drawChart(null);
+</script>
+</body>
+</html>
